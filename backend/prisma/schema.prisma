@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  walletAddress  String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  goals          GoalMetadata[]
+  budgetProfiles BudgetProfile[]
+  forecasts      ForecastReport[]
+  purchases      MarketplacePurchase[]
+}
+
+model GoalMetadata {
+  id          String   @id @default(cuid())
+  userId      String
+  chainGoalId Int?
+  ownerWallet String?
+  title       String
+  description String?
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BudgetProfile {
+  id               String   @id @default(cuid())
+  userId           String
+  monthlyIncome    Float
+  fixedExpenses    Float
+  variableExpenses Float
+  createdAt        DateTime @default(now())
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ForecastReport {
+  id                         String   @id @default(cuid())
+  userId                     String
+  chainGoalId                Int
+  successProbability         Float
+  riskLevel                  String
+  recommendedMonthlyDeposit  Float
+  recommendedWeeklyDeposit   Float
+  forecastedCompletionDate   String?
+  budgetPressure             String?
+  summary                    String
+  recommendations            String
+  aiProvider                 String
+  createdAt                  DateTime @default(now())
+
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BlockchainEvent {
+  id          String   @id @default(cuid())
+  eventName   String
+  txHash      String   @unique
+  blockNumber Int
+  userWallet  String?
+  chainGoalId Int?
+  payload     String
+  createdAt   DateTime @default(now())
+}
+
+model MarketplacePurchase {
+  id          String   @id @default(cuid())
+  userId      String
+  productId   String
+  title       String
+  priceSave   Float
+  code        String
+  txHash      String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

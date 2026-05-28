@@ -1,0 +1,91 @@
+services:
+  blockchain-node:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile
+    container_name: savewise-blockchain-node
+    command: npm run node -- --hostname 0.0.0.0
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./shared:/app/shared
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_chainId',params:[]})}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  blockchain-deploy:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile
+    container_name: savewise-blockchain-deploy
+    depends_on:
+      blockchain-node:
+        condition: service_healthy
+    environment:
+      HARDHAT_RPC_URL: http://blockchain-node:8545
+    volumes:
+      - ./shared:/app/shared
+    command: sh -c "node scripts/wait-for-rpc.js http://blockchain-node:8545 && npm run deploy:localhost"
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: savewise-backend
+    depends_on:
+      blockchain-deploy:
+        condition: service_completed_successfully
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      NODE_ENV: development
+      DATABASE_URL: file:/app/data/dev.db
+      JWT_SECRET: ${JWT_SECRET:-savewise_super_secret_change_me}
+      JWT_EXPIRES_IN: 7d
+      RPC_URL: http://blockchain-node:8545
+      CONTRACTS_DIR: /app/shared/contracts
+      BACKEND_PRIVATE_KEY: ${BACKEND_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+    volumes:
+      - ./shared:/app/shared:ro
+      - backend-data:/app/data
+    command: sh -c "npx prisma db push && npm run dev"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: savewise-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:4000
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  backend-data:

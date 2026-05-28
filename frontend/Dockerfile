@@ -1,0 +1,10 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app/frontend
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+EXPOSE 5173
