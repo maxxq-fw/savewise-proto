@@ -12,6 +12,16 @@ function getEnv(name: string, fallback?: string) {
   return value;
 }
 
+function getRequiredEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value.trim();
+}
+
 export const env = {
   nodeEnv: getEnv("NODE_ENV", "development"),
   port: Number(getEnv("PORT", "4000")),
@@ -23,7 +33,9 @@ export const env = {
 
   rpcUrl: getEnv("RPC_URL", "http://127.0.0.1:8545"),
   contractsDir: getEnv("CONTRACTS_DIR", "../shared/contracts"),
-  backendPrivateKey: getEnv("BACKEND_PRIVATE_KEY"),
+
+  backendPrivateKey: getRequiredEnv("BACKEND_PRIVATE_KEY"),
+  custodialPrivateKeys: getRequiredEnv("CUSTODIAL_PRIVATE_KEYS"),
 
   groqApiKey: getEnv("GROQ_API_KEY", ""),
   groqModel: getEnv("GROQ_MODEL", "llama-3.1-8b-instant")

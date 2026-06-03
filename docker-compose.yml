@@ -50,11 +50,12 @@ services:
       PORT: 4000
       NODE_ENV: development
       DATABASE_URL: file:/app/data/dev.db
-      JWT_SECRET: ${JWT_SECRET:-savewise_super_secret_change_me}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_EXPIRES_IN: 7d
       RPC_URL: http://blockchain-node:8545
       CONTRACTS_DIR: /app/shared/contracts
-      BACKEND_PRIVATE_KEY: ${BACKEND_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      BACKEND_PRIVATE_KEY: ${BACKEND_PRIVATE_KEY:?Set BACKEND_PRIVATE_KEY in .env}
+      CUSTODIAL_PRIVATE_KEYS: ${CUSTODIAL_PRIVATE_KEYS:?Set CUSTODIAL_PRIVATE_KEYS in .env}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
     volumes:
