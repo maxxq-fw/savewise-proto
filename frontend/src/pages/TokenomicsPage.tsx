@@ -76,7 +76,7 @@ export function TokenomicsPage() {
         <StatCard
           title="Reward Emission"
           value={`+${tokenConfig.regularDepositReward} / +${tokenConfig.boostedDepositReward}`}
-          description="Награда за обычный и boost-депозит"
+          description="Награда за плановый этап и boost-этап"
           icon={Sparkles}
         />
         <StatCard
@@ -126,8 +126,8 @@ export function TokenomicsPage() {
         <h3 className="text-lg font-semibold">Utility токена</h3>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {[
-            `Награда за регулярный депозит: +${tokenConfig.regularDepositReward} SAVE`,
-            `Reward Boost: следующие ${tokenConfig.rewardBoostDepositsPerPurchase} депозитов приносят по +${tokenConfig.boostedDepositReward} SAVE`,
+            `Награда за плановый этап накопления: +${tokenConfig.regularDepositReward} SAVE`,
+            `Reward Boost: следующие ${tokenConfig.rewardBoostDepositsPerPurchase} reward-этапов приносят по +${tokenConfig.boostedDepositReward} SAVE`,
             `Бонус за достижение цели: +${tokenConfig.goalCompletionReward} SAVE`,
             `Досрочный вывод без pass: -${tokenConfig.earlyWithdrawPenalty} SAVE`,
             `No-Penalty Pass: -${tokenConfig.noPenaltyPassPrice} SAVE`,

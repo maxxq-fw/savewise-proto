@@ -16,18 +16,28 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         uint256 deadline;
         uint256 depositInterval;
         uint256 lastDepositAt;
+        uint256 rewardedMilestones;
         bool completed;
         bool closed;
     }
 
     struct UserBenefits {
         uint256 noPenaltyPasses;
-        uint256 rewardBoosts; // remaining boosted deposits
+        uint256 rewardBoosts; // remaining boosted reward milestones
+    }
+
+    struct RewardPlan {
+        uint256 periodCount;
+        uint256 plannedDepositAmount;
+        uint256 rewardedMilestones;
+        uint256 totalMilestones;
     }
 
     SaveToken public immutable saveToken;
 
     uint256 public nextGoalId = 1;
+
+    uint256 public minimumDepositAmount = 1 ether;
 
     uint256 public regularDepositReward = 5 * 10 ** 18;
     uint256 public boostedDepositReward = 10 * 10 ** 18;
@@ -42,7 +52,7 @@ contract SavingsVault is ReentrancyGuard, Ownable {
     mapping(uint256 => Goal) private goals;
     mapping(address => uint256[]) private userGoalIds;
     mapping(address => uint256) public noPenaltyPasses;
-    mapping(address => uint256) public rewardBoosts; // remaining boosted deposits
+    mapping(address => uint256) public rewardBoosts; // remaining boosted reward milestones
 
     event GoalCreated(
         uint256 indexed goalId,
@@ -50,7 +60,9 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         string title,
         uint256 targetAmount,
         uint256 deadline,
-        uint256 depositInterval
+        uint256 depositInterval,
+        uint256 plannedDepositAmount,
+        uint256 periodCount
     );
 
     event DepositMade(
@@ -58,7 +70,9 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         address indexed user,
         uint256 amount,
         uint256 currentAmount,
-        uint256 rewardAmount
+        uint256 rewardAmount,
+        uint256 newRewardMilestones,
+        uint256 rewardedMilestones
     );
 
     event GoalCompleted(
@@ -102,6 +116,7 @@ contract SavingsVault is ReentrancyGuard, Ownable {
     event RewardBoostUsed(
         address indexed user,
         uint256 indexed goalId,
+        uint256 boostedMilestones,
         uint256 rewardAmount,
         uint256 remainingBoosts
     );
@@ -122,7 +137,10 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         uint256 depositInterval
     ) external returns (uint256) {
         require(bytes(title).length > 0, "SavingsVault: empty title");
-        require(targetAmount > 0, "SavingsVault: target must be positive");
+        require(
+            targetAmount >= minimumDepositAmount,
+            "SavingsVault: target below minimum deposit"
+        );
         require(deadline > block.timestamp, "SavingsVault: invalid deadline");
         require(
             depositInterval > 0,
@@ -141,11 +159,14 @@ contract SavingsVault is ReentrancyGuard, Ownable {
             deadline: deadline,
             depositInterval: depositInterval,
             lastDepositAt: 0,
+            rewardedMilestones: 0,
             completed: false,
             closed: false
         });
 
         userGoalIds[msg.sender].push(goalId);
+
+        RewardPlan memory plan = _getRewardPlan(goals[goalId]);
 
         emit GoalCreated(
             goalId,
@@ -153,7 +174,9 @@ contract SavingsVault is ReentrancyGuard, Ownable {
             title,
             targetAmount,
             deadline,
-            depositInterval
+            depositInterval,
+            plan.plannedDepositAmount,
+            plan.periodCount
         );
 
         return goalId;
@@ -166,33 +189,60 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         require(!goal.completed, "SavingsVault: goal already completed");
         require(!goal.closed, "SavingsVault: goal is closed");
         require(block.timestamp <= goal.deadline, "SavingsVault: deadline passed");
-        require(msg.value > 0, "SavingsVault: deposit must be positive");
+        require(
+            msg.value >= minimumDepositAmount,
+            "SavingsVault: minimum deposit is 1 ETH"
+        );
 
         goal.currentAmount += msg.value;
         goal.lastDepositAt = block.timestamp;
 
-        uint256 rewardAmount = regularDepositReward;
+        RewardPlan memory plan = _getRewardPlan(goal);
+        uint256 achievedMilestones = goal.currentAmount / plan.plannedDepositAmount;
 
-        if (rewardBoosts[msg.sender] > 0) {
-            rewardBoosts[msg.sender] -= 1;
-            rewardAmount = boostedDepositReward;
-
-            emit RewardBoostUsed(
-                msg.sender,
-                goalId,
-                rewardAmount,
-                rewardBoosts[msg.sender]
-            );
+        if (achievedMilestones > plan.totalMilestones) {
+            achievedMilestones = plan.totalMilestones;
         }
 
-        saveToken.mint(msg.sender, rewardAmount);
+        uint256 newRewardMilestones = 0;
+        uint256 rewardAmount = 0;
+
+        if (achievedMilestones > goal.rewardedMilestones) {
+            newRewardMilestones = achievedMilestones - goal.rewardedMilestones;
+            goal.rewardedMilestones = achievedMilestones;
+
+            uint256 boostedMilestones = _min(rewardBoosts[msg.sender], newRewardMilestones);
+            uint256 regularMilestones = newRewardMilestones - boostedMilestones;
+
+            if (boostedMilestones > 0) {
+                rewardBoosts[msg.sender] -= boostedMilestones;
+                uint256 boostedRewardAmount = boostedMilestones * boostedDepositReward;
+                rewardAmount += boostedRewardAmount;
+
+                emit RewardBoostUsed(
+                    msg.sender,
+                    goalId,
+                    boostedMilestones,
+                    boostedRewardAmount,
+                    rewardBoosts[msg.sender]
+                );
+            }
+
+            rewardAmount += regularMilestones * regularDepositReward;
+
+            if (rewardAmount > 0) {
+                saveToken.mint(msg.sender, rewardAmount);
+            }
+        }
 
         emit DepositMade(
             goalId,
             msg.sender,
             msg.value,
             goal.currentAmount,
-            rewardAmount
+            rewardAmount,
+            newRewardMilestones,
+            goal.rewardedMilestones
         );
     }
 
@@ -310,6 +360,11 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         return goals[goalId];
     }
 
+    function getGoalRewardPlan(uint256 goalId) external view returns (RewardPlan memory) {
+        require(goals[goalId].owner != address(0), "SavingsVault: goal not found");
+        return _getRewardPlan(goals[goalId]);
+    }
+
     function getUserGoals(address user) external view returns (uint256[] memory) {
         return userGoalIds[user];
     }
@@ -353,5 +408,54 @@ contract SavingsVault is ReentrancyGuard, Ownable {
         );
 
         rewardBoostDepositsPerPurchase = newRewardBoostDepositsPerPurchase;
+    }
+
+    function updateMinimumDepositAmount(uint256 newMinimumDepositAmount) external onlyOwner {
+        require(
+            newMinimumDepositAmount > 0,
+            "SavingsVault: minimum deposit must be positive"
+        );
+
+        minimumDepositAmount = newMinimumDepositAmount;
+    }
+
+    function _getRewardPlan(Goal storage goal) private view returns (RewardPlan memory) {
+        uint256 savingDuration = goal.deadline - goal.startDate;
+        uint256 periodCount = _ceilDiv(savingDuration, goal.depositInterval);
+
+        if (periodCount == 0) {
+            periodCount = 1;
+        }
+
+        uint256 plannedDepositAmount = _ceilDiv(goal.targetAmount, periodCount);
+
+        if (plannedDepositAmount < minimumDepositAmount) {
+            plannedDepositAmount = minimumDepositAmount;
+        }
+
+        uint256 totalMilestones = _ceilDiv(goal.targetAmount, plannedDepositAmount);
+
+        if (totalMilestones == 0) {
+            totalMilestones = 1;
+        }
+
+        return RewardPlan({
+            periodCount: periodCount,
+            plannedDepositAmount: plannedDepositAmount,
+            rewardedMilestones: goal.rewardedMilestones,
+            totalMilestones: totalMilestones
+        });
+    }
+
+    function _ceilDiv(uint256 a, uint256 b) private pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+
+        return ((a - 1) / b) + 1;
+    }
+
+    function _min(uint256 a, uint256 b) private pure returns (uint256) {
+        return a < b ? a : b;
     }
 }

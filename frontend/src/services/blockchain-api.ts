@@ -36,6 +36,12 @@ export interface ChainGoal {
   deadline: number;
   depositInterval: number;
   lastDepositAt: number;
+  rewardedMilestones: number;
+  periodCount: number;
+  plannedDepositAmountWei: string;
+  plannedDepositAmountEth: string;
+  totalRewardMilestones: number;
+  minimumDepositAmountEth: string;
   completed: boolean;
   closed: boolean;
 }

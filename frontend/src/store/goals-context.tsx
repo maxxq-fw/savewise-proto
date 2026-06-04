@@ -23,7 +23,17 @@ interface GoalsContextValue {
   saveBalance: number;
   totalBurned: number;
   createGoal: (input: CreateGoalInput) => SavingsGoal;
-  depositToGoal: (goalId: number, amount: number, rewardAmount?: number) => void;
+  depositToGoal: (
+    goalId: number,
+    amount: number,
+    rewardAmount?: number,
+    updatedGoal?: {
+      currentAmountEth: string;
+      plannedDepositAmountEth?: string;
+      rewardedMilestones?: number;
+      totalRewardMilestones?: number;
+    }
+  ) => void;
   completeGoal: (goalId: number) => void;
   earlyWithdraw: (goalId: number, burnedAmount?: number) => void;
   generateForecast: (goalId: number, budget: BudgetInput) => ForecastReport;
@@ -193,6 +203,9 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       successProbability: 50,
       totalRewards: 0,
       burnedTokens: 0,
+      plannedDepositAmount: input.plannedDepositAmount ?? Math.max(1, input.targetAmount),
+      rewardedMilestones: input.rewardedMilestones ?? 0,
+      totalRewardMilestones: input.totalRewardMilestones ?? 1,
       deposits: []
     };
 
@@ -204,7 +217,17 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     return newGoal;
   }
 
-  function depositToGoal(goalId: number, amount: number, rewardAmount = tokenConfig.regularDepositReward) {
+  function depositToGoal(
+    goalId: number,
+    amount: number,
+    rewardAmount = 0,
+    updatedGoal?: {
+      currentAmountEth: string;
+      plannedDepositAmountEth?: string;
+      rewardedMilestones?: number;
+      totalRewardMilestones?: number;
+    }
+  ) {
     if (amount <= 0) return;
 
     setGoals((current) =>
@@ -219,10 +242,9 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
           rewardAmount
         };
 
-        const nextCurrentAmount = Math.min(
-          goal.targetAmount,
-          goal.currentAmount + amount
-        );
+        const nextCurrentAmount = updatedGoal
+          ? Number(updatedGoal.currentAmountEth)
+          : Math.min(goal.targetAmount, goal.currentAmount + amount);
 
         const progress = Math.round(
           (nextCurrentAmount / goal.targetAmount) * 100
@@ -232,6 +254,13 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
           ...goal,
           currentAmount: nextCurrentAmount,
           totalRewards: goal.totalRewards + rewardAmount,
+          plannedDepositAmount: updatedGoal?.plannedDepositAmountEth
+            ? Number(updatedGoal.plannedDepositAmountEth)
+            : goal.plannedDepositAmount,
+          rewardedMilestones:
+            updatedGoal?.rewardedMilestones ?? goal.rewardedMilestones,
+          totalRewardMilestones:
+            updatedGoal?.totalRewardMilestones ?? goal.totalRewardMilestones,
           successProbability: Math.min(
             95,
             Math.max(goal.successProbability, progress)

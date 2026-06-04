@@ -24,6 +24,7 @@ interface RawGoal {
   deadline: bigint;
   depositInterval: bigint;
   lastDepositAt: bigint;
+  rewardedMilestones: bigint;
   completed: boolean;
   closed: boolean;
 }
@@ -50,7 +51,43 @@ function getContractsPath(fileName: string) {
   return path.resolve(process.cwd(), env.contractsDir, fileName);
 }
 
+const ONE_ETH = 10n ** 18n;
+
+function ceilDiv(a: bigint, b: bigint) {
+  if (a === 0n) return 0n;
+  return ((a - 1n) / b) + 1n;
+}
+
+function getGoalRewardPlan(goal: RawGoal) {
+  const duration = goal.deadline - goal.startDate;
+  let periodCount = ceilDiv(duration, goal.depositInterval);
+
+  if (periodCount === 0n) {
+    periodCount = 1n;
+  }
+
+  let plannedDepositAmount = ceilDiv(goal.targetAmount, periodCount);
+
+  if (plannedDepositAmount < ONE_ETH) {
+    plannedDepositAmount = ONE_ETH;
+  }
+
+  let totalRewardMilestones = ceilDiv(goal.targetAmount, plannedDepositAmount);
+
+  if (totalRewardMilestones === 0n) {
+    totalRewardMilestones = 1n;
+  }
+
+  return {
+    periodCount,
+    plannedDepositAmount,
+    totalRewardMilestones
+  };
+}
+
 function normalizeGoal(goal: RawGoal) {
+  const rewardPlan = getGoalRewardPlan(goal);
+
   return {
     id: Number(goal.id),
     owner: goal.owner,
@@ -63,6 +100,12 @@ function normalizeGoal(goal: RawGoal) {
     deadline: Number(goal.deadline),
     depositInterval: Number(goal.depositInterval),
     lastDepositAt: Number(goal.lastDepositAt),
+    rewardedMilestones: Number(goal.rewardedMilestones),
+    periodCount: Number(rewardPlan.periodCount),
+    plannedDepositAmountWei: rewardPlan.plannedDepositAmount.toString(),
+    plannedDepositAmountEth: ethers.formatEther(rewardPlan.plannedDepositAmount),
+    totalRewardMilestones: Number(rewardPlan.totalRewardMilestones),
+    minimumDepositAmountEth: "1.0",
     completed: goal.completed,
     closed: goal.closed
   };
@@ -286,7 +329,7 @@ class BlockchainService {
       }
     }
 
-    return "5.0";
+    return "0.0";
   }
 
   private extractEarlyWithdrawBurnedAmount(
@@ -363,9 +406,14 @@ class BlockchainService {
   async deposit(walletAddress: string, goalId: number, amountEth: string) {
     return this.withWalletTransactionQueue(walletAddress, async () => {
       const { wallet, savingsVault } = this.getWritableContracts(walletAddress);
+      const depositAmount = ethers.parseEther(amountEth);
+
+      if (depositAmount < ONE_ETH) {
+        throw new HttpError(400, "Минимальная сумма пополнения — 1 ETH.");
+      }
 
       const tx = await savingsVault.deposit(goalId, {
-        value: ethers.parseEther(amountEth),
+        value: depositAmount,
         nonce: await this.getFreshNonce(wallet)
       });
 

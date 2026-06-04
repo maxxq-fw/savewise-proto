@@ -49,6 +49,9 @@ export function GoalDetailsPage() {
   const progress = Math.round((currentGoal.currentAmount / currentGoal.targetAmount) * 100);
   const canComplete =
     currentGoal.currentAmount >= currentGoal.targetAmount && currentGoal.status === "ACTIVE";
+  const plannedDepositAmount = currentGoal.plannedDepositAmount ?? currentGoal.targetAmount;
+  const rewardedMilestones = currentGoal.rewardedMilestones ?? 0;
+  const totalRewardMilestones = currentGoal.totalRewardMilestones ?? 1;
 
   async function handleDeposit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,15 +60,16 @@ export function GoalDetailsPage() {
     setIsTxLoading(true);
 
     try {
-      if (!depositAmount || Number(depositAmount) <= 0) {
-        throw new Error("Укажи сумму пополнения больше 0 ETH.");
+      if (!depositAmount || Number(depositAmount) < 1) {
+        throw new Error("Минимальная сумма пополнения — 1 ETH.");
       }
 
       const response = await depositChainGoalRequest(currentGoal.id, depositAmount);
       depositToGoal(
         currentGoal.id,
         Number(response.goal.currentAmountEth) - currentGoal.currentAmount,
-        Number(response.rewardAmountSave)
+        Number(response.rewardAmountSave),
+        response.goal
       );
       setTxHash(response.txHash);
       setDepositAmount("");
@@ -151,7 +155,7 @@ export function GoalDetailsPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-4">
+        <div className="mt-6 grid gap-4 md:grid-cols-5">
           <div className="rounded-xl bg-slate-50 p-4">
             <div className="text-xs text-slate-500">ID в контракте</div>
             <div className="mt-1 font-medium">#{currentGoal.id}</div>
@@ -169,6 +173,13 @@ export function GoalDetailsPage() {
           <div className="rounded-xl bg-slate-50 p-4">
             <div className="text-xs text-slate-500">SAVE-награды</div>
             <div className="mt-1 font-medium">{currentGoal.totalRewards} SAVE</div>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="text-xs text-slate-500">Плановый этап</div>
+            <div className="mt-1 font-medium">{plannedDepositAmount} ETH</div>
+            <div className="mt-1 text-xs text-slate-500">
+              {rewardedMilestones}/{totalRewardMilestones} этапов
+            </div>
           </div>
         </div>
       </div>
@@ -193,19 +204,20 @@ export function GoalDetailsPage() {
           >
             <h3 className="text-lg font-semibold">Пополнить цель</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Депозит отправляется в контракт SavingsVault через backend.
+              Минимальное пополнение — 1 ETH. SAVE начисляется только при достижении планового этапа: {plannedDepositAmount} ETH.
             </p>
 
             <div className="mt-4">
               <label className="text-sm font-medium">Сумма пополнения, ETH</label>
               <input
-                min="0.001"
-                step="0.001"
+                min="1"
+                step="0.01"
                 type="number"
                 required
                 value={depositAmount}
                 onChange={(event) => setDepositAmount(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-950"
+                placeholder="Минимум 1 ETH"
               />
             </div>
 
@@ -214,7 +226,7 @@ export function GoalDetailsPage() {
               type="submit"
               className="mt-4 w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              {isTxLoading ? "Транзакция..." : "Пополнить и получить SAVE"}
+              {isTxLoading ? "Транзакция..." : "Пополнить цель"}
             </button>
           </form>
 

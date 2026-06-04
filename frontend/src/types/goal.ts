@@ -24,6 +24,9 @@ export interface SavingsGoal {
   successProbability: number;
   totalRewards: number;
   burnedTokens: number;
+  plannedDepositAmount: number;
+  rewardedMilestones: number;
+  totalRewardMilestones: number;
   deposits: DepositRecord[];
 }
 
@@ -35,6 +38,9 @@ export interface CreateGoalInput {
   targetAmount: number;
   deadline: string;
   depositInterval: DepositInterval;
+  plannedDepositAmount?: number;
+  rewardedMilestones?: number;
+  totalRewardMilestones?: number;
 }
 
 export interface BudgetInput {

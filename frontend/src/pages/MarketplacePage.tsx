@@ -146,7 +146,7 @@ export function MarketplacePage() {
         <StatCard
           title="Reward Boost"
           value={`${benefits?.rewardBoosts ?? 0}`}
-          description="Оставшиеся усиленные депозиты"
+          description="Оставшиеся усиленные reward-этапы"
           icon={BarChart3}
         />
       </section>
@@ -163,7 +163,7 @@ export function MarketplacePage() {
             </div>
             <h3 className="mt-5 text-lg font-semibold">Reward Boost</h3>
             <p className="mt-2 text-sm text-slate-500">
-              Усилитель регулярности: после покупки следующие {tokenConfig.rewardBoostDepositsPerPurchase} депозитов
+              Усилитель регулярности: после покупки следующие {tokenConfig.rewardBoostDepositsPerPurchase} плановых reward-этапов
               принесут по {tokenConfig.boostedDepositReward} SAVE вместо стандартных {tokenConfig.regularDepositReward} SAVE.
             </p>
             <div className="mt-5 rounded-xl bg-slate-50 p-4">

@@ -32,8 +32,8 @@ export function CreateGoalPage() {
     setIsSubmitting(true);
 
     try {
-      if (!targetAmount || Number(targetAmount) <= 0) {
-        throw new Error("Укажи целевую сумму больше 0 ETH.");
+      if (!targetAmount || Number(targetAmount) < 1) {
+        throw new Error("Целевая сумма должна быть не меньше 1 ETH.");
       }
 
       const deadlineTimestamp = Math.floor(new Date(deadline).getTime() / 1000);
@@ -54,7 +54,10 @@ export function CreateGoalPage() {
         category,
         targetAmount: Number(response.goal.targetAmountEth),
         deadline,
-        depositInterval
+        depositInterval,
+        plannedDepositAmount: Number(response.goal.plannedDepositAmountEth),
+        rewardedMilestones: response.goal.rewardedMilestones,
+        totalRewardMilestones: response.goal.totalRewardMilestones
       });
 
       setTxHash(response.txHash);
@@ -127,13 +130,17 @@ export function CreateGoalPage() {
           <label className="text-sm font-medium">Целевая сумма, ETH</label>
           <input
             required
-            min="0.001"
-            step="0.001"
+            min="1"
+            step="0.01"
             type="number"
             value={targetAmount}
             onChange={(event) => setTargetAmount(event.target.value)}
             className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-950"
+            placeholder="Минимум 1 ETH"
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Минимальная целевая сумма — 1 ETH. SAVE начисляется по плановым этапам, рассчитанным от срока и цели.
+          </p>
         </div>
 
         <div>

@@ -19,13 +19,19 @@ const createGoalSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   category: z.string().optional(),
-  targetAmountEth: z.string().min(1),
+  targetAmountEth: z
+    .string()
+    .min(1)
+    .refine((value) => Number(value) >= 1, "Целевая сумма должна быть не меньше 1 ETH."),
   deadline: z.number().int().positive(),
   depositInterval: z.number().int().positive()
 });
 
 const depositSchema = z.object({
-  amountEth: z.string().min(1)
+  amountEth: z
+    .string()
+    .min(1)
+    .refine((value) => Number(value) >= 1, "Минимальная сумма пополнения — 1 ETH.")
 });
 
 async function getUserWallet(request: AuthenticatedRequest) {
